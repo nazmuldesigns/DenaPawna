@@ -35,6 +35,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   late TransactionType _type;
   DateTime _date = DateTime.now();
   String? _selectedPersonId;
+  String _paymentMethod = 'cash';
   bool _submitting = false;
   final String _idempotencyKey = const Uuid().v4();
 
@@ -46,13 +47,15 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     _type = widget.existing?.type ?? widget.initialType ?? TransactionType.lent;
     _selectedPersonId = widget.existing?.personId ?? widget.personId;
     if (widget.existing != null) {
-      _amountController.text = widget.existing!.amountTaka
-          .toStringAsFixed(widget.existing!.amountTaka.truncateToDouble() ==
-                  widget.existing!.amountTaka
-              ? 0
-              : 2);
+      _amountController.text = widget.existing!.amountTaka.toStringAsFixed(
+        widget.existing!.amountTaka.truncateToDouble() ==
+                widget.existing!.amountTaka
+            ? 0
+            : 2,
+      );
       _noteController.text = widget.existing!.note ?? '';
       _date = widget.existing!.date;
+      _paymentMethod = widget.existing!.paymentMethod;
     }
   }
 
@@ -98,9 +101,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
     final amount = Money.parseAmountInput(_amountController.text);
     if (amount == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('সঠিক পরিমাণ লিখুন')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('সঠিক পরিমাণ লিখুন')));
       return;
     }
 
@@ -115,6 +118,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           amountPaisa: amountPaisa,
           date: _date,
           note: _noteController.text,
+          paymentMethod: _paymentMethod,
         );
       } else {
         await provider.addTransaction(
@@ -124,6 +128,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
           date: _date,
           note: _noteController.text,
           idempotencyKey: _idempotencyKey,
+          paymentMethod: _paymentMethod,
         );
       }
       if (mounted) {
@@ -131,9 +136,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -166,11 +171,11 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ],
               TextFormField(
                 controller: _amountController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                      RegExp(r'[0-9০-৯.,]')),
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9০-৯.,]')),
                 ],
                 decoration: const InputDecoration(
                   labelText: 'পরিমাণ (৳)',
@@ -183,6 +188,8 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              _buildPaymentMethodSelector(),
               const SizedBox(height: 16),
               InkWell(
                 onTap: _pickDate,
@@ -231,6 +238,41 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
   }
 
+  Widget _buildPaymentMethodSelector() {
+    const methods = <String, (String, IconData, Color)>{
+      'cash': ('Cash', Icons.payments_outlined, Colors.green),
+      'bkash': ('bKash', Icons.phone_android, Colors.pink),
+      'nagad': ('Nagad', Icons.account_balance_wallet_outlined, Colors.orange),
+      'bank': ('Bank Transfer', Icons.account_balance_outlined, Colors.blue),
+    };
+    return InputDecorator(
+      decoration: const InputDecoration(labelText: 'Payment method'),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: methods.containsKey(_paymentMethod) ? _paymentMethod : 'cash',
+          isExpanded: true,
+          items: methods.entries
+              .map(
+                (entry) => DropdownMenuItem<String>(
+                  value: entry.key,
+                  child: Row(
+                    children: [
+                      Icon(entry.value.$2, color: entry.value.$3),
+                      const SizedBox(width: 10),
+                      Text(entry.value.$1),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value != null) setState(() => _paymentMethod = value);
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildTypeSelector() {
     final types = TransactionType.values;
     return Wrap(
@@ -238,8 +280,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       runSpacing: 10,
       children: types.map((t) {
         final selected = _type == t;
-        final color =
-            t.balanceSign > 0 ? AppColors.receivableGreen : AppColors.payableRed;
+        final color = t.balanceSign > 0
+            ? AppColors.receivableGreen
+            : AppColors.payableRed;
         return ChoiceChip(
           label: Text(t.labelBn),
           selected: selected,

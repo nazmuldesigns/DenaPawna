@@ -18,8 +18,8 @@ class SupabaseAuthService {
   }) async {
     try {
       return await _requireClient().auth.signInWithPassword(
-        email: email,
-        password: password,
+        email: email.trim(),
+        password: password.trim(),
       );
     } on AuthException catch (error) {
       if (error.message.toLowerCase().contains('confirm')) {
@@ -68,6 +68,92 @@ class SupabaseAuthService {
   }
 
   Future<void> signOut() => _requireClient().auth.signOut();
+
+  User? get currentUser => client?.auth.currentUser;
+
+  Future<UserResponse> updatePassword(String password) {
+    return _requireClient().auth.updateUser(UserAttributes(password: password));
+  }
+
+  Future<void> sendPasswordReset(String email) {
+    return _requireClient().auth.resetPasswordForEmail(email);
+  }
+
+  Future<AuthResponse> verifyRecoveryOtp({
+    required String email,
+    required String token,
+  }) {
+    return _requireClient().auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.recovery,
+    );
+  }
+
+  Future<AuthResponse> verifyEmailChangeOtp({
+    required String email,
+    required String token,
+  }) {
+    return _requireClient().auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.emailChange,
+    );
+  }
+
+  Future<void> sendCurrentEmailOtp(String email) {
+    return _requireClient().auth.signInWithOtp(
+      email: email.trim(),
+      shouldCreateUser: false,
+    );
+  }
+
+  Future<AuthResponse> verifyCurrentEmailOtp({
+    required String email,
+    required String token,
+  }) {
+    return _requireClient().auth.verifyOTP(
+      email: email.trim(),
+      token: token,
+      type: OtpType.magiclink,
+    );
+  }
+
+  Future<UserResponse> updateProfile({
+    required String name,
+    required String phone,
+  }) {
+    return _requireClient().auth.updateUser(
+      UserAttributes(
+        data: <String, dynamic>{'full_name': name, 'phone': phone},
+      ),
+    );
+  }
+
+  Future<UserResponse> updateEmail(String email) {
+    return _requireClient().auth.updateUser(
+      UserAttributes(email: email.trim()),
+    );
+  }
+
+  Future<void> verifyCurrentPassword({
+    required String email,
+    required String password,
+  }) async {
+    await signIn(email: email, password: password);
+  }
+
+  Future<UserResponse> updatePasswordAfterRecovery(String password) {
+    return _updatePasswordAndSignOut(password);
+  }
+
+  Future<UserResponse> _updatePasswordAndSignOut(String password) async {
+    final response = await _requireClient().auth.updateUser(
+      UserAttributes(password: password),
+    );
+    await _requireClient().auth.signOut();
+    return response;
+  }
 
   SupabaseClient _requireClient() {
     final configuredClient = client;

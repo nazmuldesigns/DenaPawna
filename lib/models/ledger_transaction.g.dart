@@ -28,13 +28,14 @@ class LedgerTransactionAdapter extends TypeAdapter<LedgerTransaction> {
       isDeleted: fields[8] as bool,
       idempotencyKey: fields[9] as String?,
       isSettlement: fields[10] as bool,
+      paymentMethod: fields[11] as String? ?? 'cash',
     );
   }
 
   @override
   void write(BinaryWriter writer, LedgerTransaction obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -56,7 +57,9 @@ class LedgerTransactionAdapter extends TypeAdapter<LedgerTransaction> {
       ..writeByte(9)
       ..write(obj.idempotencyKey)
       ..writeByte(10)
-      ..write(obj.isSettlement);
+      ..write(obj.isSettlement)
+      ..writeByte(11)
+      ..write(obj.paymentMethod);
   }
 
   @override

@@ -69,7 +69,9 @@ class TransactionTile extends StatelessWidget {
                         Container(
                           margin: const EdgeInsets.only(left: 6),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.teal.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(6),
@@ -83,6 +85,7 @@ class TransactionTile extends StatelessWidget {
                             ),
                           ),
                         ),
+                      _paymentBadge(txn.paymentMethod),
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -140,6 +143,20 @@ class TransactionTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _paymentBadge(String method) {
+    const labels = {
+      'cash': ('Cash', Icons.payments_outlined, Colors.green),
+      'bkash': ('bKash', Icons.phone_android, Colors.pink),
+      'nagad': ('Nagad', Icons.account_balance_wallet_outlined, Colors.orange),
+      'bank': ('Bank', Icons.account_balance_outlined, Colors.blue),
+    };
+    final value = labels[method] ?? labels['cash']!;
+    return Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: Icon(value.$2, size: 15, color: value.$3),
     );
   }
 }

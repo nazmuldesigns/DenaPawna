@@ -33,9 +33,11 @@ class LedgerProvider extends ChangeNotifier {
     if (_searchQuery.trim().isEmpty) return all;
     final q = _searchQuery.trim().toLowerCase();
     return all
-        .where((p) =>
-            p.name.toLowerCase().contains(q) ||
-            (p.phone?.toLowerCase().contains(q) ?? false))
+        .where(
+          (p) =>
+              p.name.toLowerCase().contains(q) ||
+              (p.phone?.toLowerCase().contains(q) ?? false),
+        )
         .toList();
   }
 
@@ -104,6 +106,7 @@ class LedgerProvider extends ChangeNotifier {
     required DateTime date,
     String? note,
     String? idempotencyKey,
+    String paymentMethod = 'cash',
   }) async {
     final txn = await _service.addTransaction(
       personId: personId,
@@ -112,6 +115,7 @@ class LedgerProvider extends ChangeNotifier {
       date: date,
       note: note,
       idempotencyKey: idempotencyKey,
+      paymentMethod: paymentMethod,
     );
     notifyListeners();
     return txn;
@@ -123,6 +127,7 @@ class LedgerProvider extends ChangeNotifier {
     int? amountPaisa,
     DateTime? date,
     String? note,
+    String? paymentMethod,
   }) async {
     await _service.updateTransaction(
       txn,
@@ -130,6 +135,7 @@ class LedgerProvider extends ChangeNotifier {
       amountPaisa: amountPaisa,
       date: date,
       note: note,
+      paymentMethod: paymentMethod,
     );
     notifyListeners();
   }

@@ -8,6 +8,9 @@ import '../../providers/settings_provider.dart';
 import '../../services/backup_service.dart';
 import '../../theme/app_theme.dart';
 import 'pin_setup_screen.dart';
+import 'profile_screen.dart';
+import 'security_screen.dart';
+import '../../providers/auth_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -55,11 +58,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('বাতিল')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('বাতিল'),
+          ),
           ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('ফাইল নির্বাচন করুন')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ফাইল নির্বাচন করুন'),
+          ),
         ],
       ),
     );
@@ -91,14 +96,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     final security = settings.security;
+    final auth = context.watch<AuthProvider>();
+    final user = auth.service.currentUser;
+    final metadata = user?.userMetadata ?? const <String, dynamic>{};
+    final name = (metadata['full_name'] as String?)?.trim();
+    final email = user?.email ?? '';
 
     return Scaffold(
       appBar: AppBar(title: const Text('সেটিংস')),
@@ -108,6 +119,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : ListView(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
+                  _profileHeader(name, email, metadata['phone'] as String?),
+                  ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: const Text('Profile / Personal Details'),
+                    subtitle: const Text('প্রোফাইল / ব্যক্তিগত তথ্য'),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                    ),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.lock_outline),
+                    title: const Text('Security'),
+                    subtitle: const Text('Password management'),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SecurityScreen()),
+                    ),
+                  ),
+                  const Divider(),
                   _sectionTitle('থিম'),
                   RadioListTile<ThemeMode>(
                     title: const Text('সিস্টেম ডিফল্ট'),
@@ -131,15 +160,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _sectionTitle('সুরক্ষা'),
                   SwitchListTile(
                     title: const Text('অ্যাপ লক (PIN)'),
-                    subtitle: Text(security.hasPinSet
-                        ? 'PIN সেট করা আছে'
-                        : 'PIN সেট করা নেই'),
+                    subtitle: Text(
+                      security.hasPinSet
+                          ? 'PIN সেট করা আছে'
+                          : 'PIN সেট করা নেই',
+                    ),
                     value: security.isAppLockEnabled,
                     onChanged: (enable) async {
                       if (enable) {
                         final result = await Navigator.of(context).push<bool>(
                           MaterialPageRoute(
-                              builder: (_) => const PinSetupScreen()),
+                            builder: (_) => const PinSetupScreen(),
+                          ),
                         );
                         if (result == true) setState(() {});
                       } else {
@@ -157,7 +189,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }
                       return SwitchListTile(
                         title: const Text('বায়োমেট্রিক লক'),
-                        subtitle: const Text('ফিঙ্গারপ্রিন্ট/ফেস দিয়ে আনলক করুন'),
+                        subtitle: const Text(
+                          'ফিঙ্গারপ্রিন্ট/ফেস দিয়ে আনলক করুন',
+                        ),
                         value: security.isBiometricEnabled,
                         onChanged: (v) async {
                           await security.setBiometricEnabled(v);
@@ -169,8 +203,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const Divider(),
                   _sectionTitle('ডেটা ব্যবস্থাপনা'),
                   ListTile(
-                    leading: const Icon(Icons.backup_outlined,
-                        color: AppColors.teal),
+                    leading: const Icon(
+                      Icons.backup_outlined,
+                      color: AppColors.teal,
+                    ),
                     title: const Text('ব্যাকআপ (JSON) শেয়ার করুন'),
                     onTap: _backupJson,
                   ),
@@ -180,17 +216,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _restoreBackup,
                   ),
                   ListTile(
-                    leading:
-                        const Icon(Icons.table_chart_outlined, color: AppColors.teal),
+                    leading: const Icon(
+                      Icons.table_chart_outlined,
+                      color: AppColors.teal,
+                    ),
                     title: const Text('CSV এক্সপোর্ট করুন'),
                     onTap: _exportCsv,
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.logout,
+                      color: AppColors.payableRed,
+                    ),
+                    title: const Text('Sign Out'),
+                    onTap: auth.signOut,
                   ),
                   const Divider(),
                   _sectionTitle('অ্যাপ তথ্য'),
                   const ListTile(
                     leading: Icon(Icons.info_outline),
                     title: Text('খাতা বন্ধু'),
-                    subtitle: Text('সংস্করণ ১.০.০ • ব্যক্তিগত দেনা-পাওনার খাতা'),
+                    subtitle: Text(
+                      'সংস্করণ ১.০.০ • ব্যক্তিগত দেনা-পাওনার খাতা',
+                    ),
                   ),
                 ],
               ),
@@ -207,6 +256,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w700,
           fontSize: 13,
           color: AppColors.teal,
+        ),
+      ),
+    );
+  }
+
+  Widget _profileHeader(String? name, String email, String? phone) {
+    final displayName = name?.isNotEmpty == true ? name! : 'Account';
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: ListTile(
+        leading: CircleAvatar(child: Text(displayName[0].toUpperCase())),
+        title: Text(displayName),
+        subtitle: Text(
+          [email, phone ?? ''].where((v) => v.isNotEmpty).join(' • '),
         ),
       ),
     );

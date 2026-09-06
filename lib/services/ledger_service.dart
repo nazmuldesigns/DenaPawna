@@ -18,7 +18,8 @@ class LedgerSummary {
 
 /// Per-person ledger totals used on the Person Ledger screen.
 class PersonLedgerTotals {
-  final int totalLentPaisa; // মোট পাওনা তৈরি হয়েছে (lent + borrowed-repay base)
+  final int
+  totalLentPaisa; // মোট পাওনা তৈরি হয়েছে (lent + borrowed-repay base)
   final int totalPaidPaisa; // মোট পরিশোধ হয়েছে
   final int currentBalancePaisa; // বর্তমান ব্যালেন্স (+ receivable / - payable)
 
@@ -75,7 +76,9 @@ class LedgerService {
     bool includeDeleted = false,
   }) {
     final txns = _db.transactionsBox.values
-        .where((t) => t.personId == personId && (includeDeleted || !t.isDeleted))
+        .where(
+          (t) => t.personId == personId && (includeDeleted || !t.isDeleted),
+        )
         .toList();
     txns.sort((a, b) => a.date.compareTo(b.date));
     return txns;
@@ -248,6 +251,7 @@ class LedgerService {
     required DateTime date,
     String? note,
     String? idempotencyKey,
+    String paymentMethod = 'cash',
     bool isSettlement = false,
   }) async {
     if (amountPaisa <= 0) {
@@ -275,6 +279,7 @@ class LedgerService {
       note: note?.trim().isEmpty == true ? null : note?.trim(),
       idempotencyKey: idempotencyKey ?? _uuid.v4(),
       isSettlement: isSettlement,
+      paymentMethod: paymentMethod,
     );
     await _db.transactionsBox.add(txn);
     await refreshPersonCache(personId);
@@ -287,6 +292,7 @@ class LedgerService {
     int? amountPaisa,
     DateTime? date,
     String? note,
+    String? paymentMethod,
   }) async {
     if (amountPaisa != null && amountPaisa <= 0) {
       throw LedgerException('পরিমাণ শূন্যের বেশি হতে হবে (Amount must be > 0)');
@@ -295,6 +301,7 @@ class LedgerService {
     if (amountPaisa != null) txn.amountPaisa = amountPaisa;
     if (date != null) txn.date = date;
     if (note != null) txn.note = note.trim().isEmpty ? null : note.trim();
+    if (paymentMethod != null) txn.paymentMethod = paymentMethod;
     txn.updatedAt = DateTime.now();
     await txn.save();
     await refreshPersonCache(txn.personId);

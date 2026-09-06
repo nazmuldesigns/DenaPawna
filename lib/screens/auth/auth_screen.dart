@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../screens/root_shell.dart';
@@ -23,6 +26,8 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _showOtp = false;
   String? _otpEmail;
   String? _message;
+  Timer? _otpTimer;
+  int _otpSeconds = 0;
 
   @override
   void dispose() {
@@ -32,6 +37,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _otpController.dispose();
+    _otpTimer?.cancel();
     super.dispose();
   }
 
@@ -39,17 +45,24 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
     if (!_isRegistering) {
-      await auth.signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      try {
+        await auth.service.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        if (mounted) setState(() => _message = null);
+      } on AuthException catch (error) {
+        if (mounted) {
+          setState(() => _message = _friendlyAuthError(error));
+        }
+      }
       return;
     }
 
     try {
       await auth.service.signUpWithEmail(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
+        password: _passwordController.text.trim(),
         name: _nameController.text.trim(),
         phone: _mobileController.text.trim(),
       );
@@ -63,10 +76,187 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _otpEmail = _emailController.text.trim();
         _showOtp = true;
+        _startOtpTimer();
         _message =
             'A confirmation link has been sent to your email. Please verify your email before logging in.';
       });
     }
+  }
+
+  void _startOtpTimer() {
+    _otpTimer?.cancel();
+    setState(() => _otpSeconds = 60);
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+      } else if (_otpSeconds <= 1) {
+        timer.cancel();
+        setState(() => _otpSeconds = 0);
+      } else {
+        setState(() => _otpSeconds--);
+      }
+    });
+  }
+
+  Future<void> _resendSignupOtp() async {
+    if (_otpSeconds > 0 || _otpEmail == null) return;
+    final auth = context.read<AuthProvider>();
+    try {
+      await auth.service.signUpWithEmail(
+        email: _otpEmail!,
+        password: _passwordController.text.trim(),
+        name: _nameController.text.trim(),
+        phone: _mobileController.text.trim(),
+      );
+      if (mounted) {
+        _startOtpTimer();
+        setState(() => _message = 'A new confirmation code was sent.');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _message = _friendlyError(error));
+    }
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    final email = TextEditingController();
+    final otp = TextEditingController();
+    final password = TextEditingController();
+    final confirm = TextEditingController();
+    var seconds = 0;
+    Timer? timer;
+    var sent = false;
+    var verified = false;
+    String? message;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, refresh) => AlertDialog(
+          title: const Text('Forgot Password?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: email,
+                enabled: !sent,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              if (sent && !verified) ...[
+                TextField(
+                  controller: otp,
+                  maxLength: 6,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'OTP'),
+                ),
+                Text(
+                  seconds == 0
+                      ? 'You can resend the OTP now.'
+                      : 'Resend OTP in 00:${seconds.toString().padLeft(2, '0')}',
+                ),
+              ],
+              if (verified) ...[
+                TextField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'New Password'),
+                ),
+                TextField(
+                  controller: confirm,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm Password',
+                  ),
+                ),
+              ],
+              if (message != null) Text(message!),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                try {
+                  if (!sent) {
+                    await context
+                        .read<AuthProvider>()
+                        .service
+                        .sendPasswordReset(email.text.trim());
+                    refresh(() {
+                      sent = true;
+                      seconds = 60;
+                      message = 'OTP sent to your email.';
+                    });
+                    timer = Timer.periodic(const Duration(seconds: 1), (tick) {
+                      if (seconds <= 1) {
+                        tick.cancel();
+                        refresh(() => seconds = 0);
+                      } else {
+                        refresh(() => seconds--);
+                      }
+                    });
+                  } else if (!verified) {
+                    await context
+                        .read<AuthProvider>()
+                        .service
+                        .verifyRecoveryOtp(
+                          email: email.text.trim(),
+                          token: otp.text.trim(),
+                        );
+                    refresh(() {
+                      verified = true;
+                      message = 'OTP verified.';
+                    });
+                  } else {
+                    if (password.text.length < 6 ||
+                        password.text != confirm.text) {
+                      refresh(
+                        () => message =
+                            'Passwords must match and be at least 6 characters.',
+                      );
+                      return;
+                    }
+                    await context
+                        .read<AuthProvider>()
+                        .service
+                        .updatePasswordAfterRecovery(password.text);
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  }
+                } catch (error) {
+                  refresh(() => message = _friendlyError(error));
+                }
+              },
+              child: Text(
+                !sent
+                    ? 'Send OTP'
+                    : verified
+                    ? 'Set Password'
+                    : 'Verify OTP',
+              ),
+            ),
+            if (sent && !verified)
+              TextButton(
+                onPressed: seconds > 0
+                    ? null
+                    : () async {
+                        await context
+                            .read<AuthProvider>()
+                            .service
+                            .sendPasswordReset(email.text.trim());
+                        refresh(() => seconds = 60);
+                      },
+                child: const Text('Resend OTP'),
+              ),
+          ],
+        ),
+      ),
+    );
+    timer?.cancel();
+    email.dispose();
+    otp.dispose();
+    password.dispose();
+    confirm.dispose();
   }
 
   Future<void> _verifyOtp() async {
@@ -75,6 +265,7 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _message = 'Enter the 6-digit confirmation code.');
       return;
     }
+
     final auth = context.read<AuthProvider>();
     try {
       final response = await auth.service.verifyEmailOtp(
@@ -104,7 +295,21 @@ class _AuthScreenState extends State<AuthScreen> {
         message.toLowerCase().contains('invalid')) {
       return 'That confirmation code is invalid or expired. Please try again.';
     }
+
     return message.replaceFirst('Exception: ', '');
+  }
+
+  String _friendlyAuthError(AuthException error) {
+    final message = error.message.toLowerCase();
+    if (message.contains('confirm')) {
+      return 'Email not confirmed. Please verify your email first.';
+    }
+    if (message.contains('invalid login') ||
+        message.contains('invalid credentials') ||
+        message.contains('password')) {
+      return 'Incorrect email or password. Please try again.';
+    }
+    return error.message;
   }
 
   String? _required(String? value, String label) =>
@@ -165,6 +370,14 @@ class _AuthScreenState extends State<AuthScreen> {
                   _message = null;
                 }),
           child: const Text('Back to sign in'),
+        ),
+        TextButton(
+          onPressed: auth.isBusy ? null : _resendSignupOtp,
+          child: Text(
+            _otpSeconds > 0
+                ? 'Resend OTP in 00:${_otpSeconds.toString().padLeft(2, '0')}'
+                : 'Resend OTP',
+          ),
         ),
       ],
     );
@@ -237,6 +450,11 @@ class _AuthScreenState extends State<AuthScreen> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
+          if (!_isRegistering)
+            TextButton(
+              onPressed: auth.isBusy ? null : _showForgotPasswordDialog,
+              child: const Text('Forgot Password?'),
+            ),
           if (_message != null) ...[
             const SizedBox(height: 12),
             Text(_message!),

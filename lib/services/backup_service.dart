@@ -18,29 +18,38 @@ class BackupService {
   /// Serializes all people + transactions into a single JSON backup
   /// document (schema-versioned for forward compatibility).
   Map<String, dynamic> exportToJsonMap() {
-    final people = _db.peopleBox.values.map((p) => {
-          'id': p.id,
-          'name': p.name,
-          'phone': p.phone,
-          'note': p.note,
-          'photoPath': p.photoPath,
-          'createdAt': p.createdAt.toIso8601String(),
-          'isDeleted': p.isDeleted,
-        }).toList();
+    final people = _db.peopleBox.values
+        .map(
+          (p) => {
+            'id': p.id,
+            'name': p.name,
+            'phone': p.phone,
+            'note': p.note,
+            'photoPath': p.photoPath,
+            'createdAt': p.createdAt.toIso8601String(),
+            'isDeleted': p.isDeleted,
+          },
+        )
+        .toList();
 
-    final txns = _db.transactionsBox.values.map((t) => {
-          'id': t.id,
-          'personId': t.personId,
-          'type': t.type.name,
-          'amountPaisa': t.amountPaisa,
-          'date': t.date.toIso8601String(),
-          'note': t.note,
-          'createdAt': t.createdAt.toIso8601String(),
-          'updatedAt': t.updatedAt?.toIso8601String(),
-          'isDeleted': t.isDeleted,
-          'idempotencyKey': t.idempotencyKey,
-          'isSettlement': t.isSettlement,
-        }).toList();
+    final txns = _db.transactionsBox.values
+        .map(
+          (t) => {
+            'id': t.id,
+            'personId': t.personId,
+            'type': t.type.name,
+            'amountPaisa': t.amountPaisa,
+            'date': t.date.toIso8601String(),
+            'note': t.note,
+            'createdAt': t.createdAt.toIso8601String(),
+            'updatedAt': t.updatedAt?.toIso8601String(),
+            'isDeleted': t.isDeleted,
+            'idempotencyKey': t.idempotencyKey,
+            'isSettlement': t.isSettlement,
+            'paymentMethod': t.paymentMethod,
+          },
+        )
+        .toList();
 
     return {
       'schemaVersion': 1,
@@ -55,7 +64,9 @@ class BackupService {
     final dir = await getApplicationDocumentsDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final file = File('${dir.path}/khata_bondhu_backup_$timestamp.json');
-    final jsonStr = const JsonEncoder.withIndent('  ').convert(exportToJsonMap());
+    final jsonStr = const JsonEncoder.withIndent(
+      '  ',
+    ).convert(exportToJsonMap());
     await file.writeAsString(jsonStr);
     return file;
   }
@@ -90,7 +101,8 @@ class BackupService {
           phone: map['phone'] as String?,
           note: map['note'] as String?,
           photoPath: map['photoPath'] as String?,
-          createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ??
+          createdAt:
+              DateTime.tryParse(map['createdAt'] as String? ?? '') ??
               DateTime.now(),
           isDeleted: map['isDeleted'] as bool? ?? false,
         );
@@ -122,6 +134,7 @@ class BackupService {
         existing.note = map['note'] as String?;
         existing.isDeleted = map['isDeleted'] as bool? ?? false;
         existing.isSettlement = map['isSettlement'] as bool? ?? false;
+        existing.paymentMethod = map['paymentMethod'] as String? ?? 'cash';
         await existing.save();
       } else {
         final txn = LedgerTransaction(
@@ -131,7 +144,8 @@ class BackupService {
           amountPaisa: map['amountPaisa'] as int,
           date: DateTime.parse(map['date'] as String),
           note: map['note'] as String?,
-          createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ??
+          createdAt:
+              DateTime.tryParse(map['createdAt'] as String? ?? '') ??
               DateTime.now(),
           updatedAt: map['updatedAt'] != null
               ? DateTime.tryParse(map['updatedAt'] as String)
@@ -139,6 +153,7 @@ class BackupService {
           isDeleted: map['isDeleted'] as bool? ?? false,
           idempotencyKey: map['idempotencyKey'] as String?,
           isSettlement: map['isSettlement'] as bool? ?? false,
+          paymentMethod: map['paymentMethod'] as String? ?? 'cash',
         );
         await _db.transactionsBox.add(txn);
       }

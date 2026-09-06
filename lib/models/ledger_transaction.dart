@@ -48,6 +48,9 @@ class LedgerTransaction extends HiveObject {
   @HiveField(10)
   bool isSettlement;
 
+  @HiveField(11)
+  String paymentMethod;
+
   LedgerTransaction({
     required this.id,
     required this.personId,
@@ -60,6 +63,7 @@ class LedgerTransaction extends HiveObject {
     this.isDeleted = false,
     this.idempotencyKey,
     this.isSettlement = false,
+    this.paymentMethod = 'cash',
   }) : createdAt = createdAt ?? DateTime.now();
 
   double get amountTaka => amountPaisa / 100.0;

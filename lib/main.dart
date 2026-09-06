@@ -9,7 +9,9 @@ import 'screens/auth/auth_screen.dart';
 import 'screens/root_shell.dart';
 import 'services/database_service.dart';
 import 'services/supabase_auth_service.dart';
+import 'services/app_update_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/app_update_overlay.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,7 +77,12 @@ class KhataBondhuApp extends StatelessWidget {
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [Locale('en'), Locale('bn')],
-            home: auth.isAuthenticated ? const RootShell() : const AuthScreen(),
+            home: AppUpdateOverlay(
+              service: AppUpdateService(authService.client),
+              child: auth.isAuthenticated
+                  ? const RootShell()
+                  : const AuthScreen(),
+            ),
           );
         },
       ),

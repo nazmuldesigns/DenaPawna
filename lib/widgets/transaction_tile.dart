@@ -154,9 +154,28 @@ class TransactionTile extends StatelessWidget {
       'bank': ('Bank', Icons.account_balance_outlined, Colors.blue),
     };
     final value = labels[method] ?? labels['cash']!;
-    return Padding(
-      padding: const EdgeInsets.only(left: 6),
-      child: Icon(value.$2, size: 15, color: value.$3),
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: value.$3.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(value.$2, size: 14, color: value.$3),
+          const SizedBox(width: 3),
+          Text(
+            value.$1,
+            style: TextStyle(
+              color: value.$3,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

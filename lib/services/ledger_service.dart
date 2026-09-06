@@ -332,6 +332,7 @@ class LedgerService {
     required DateTime date,
     String? note,
     String? idempotencyKey,
+    String paymentMethod = 'cash',
   }) async {
     final balance = calculatePersonBalancePaisa(personId);
     if (balance == 0) {
@@ -347,6 +348,7 @@ class LedgerService {
       date: date,
       note: note,
       idempotencyKey: idempotencyKey,
+      paymentMethod: paymentMethod,
     );
   }
 
@@ -358,6 +360,7 @@ class LedgerService {
     required DateTime date,
     String? note,
     String? idempotencyKey,
+    String paymentMethod = 'cash',
   }) async {
     final balance = calculatePersonBalancePaisa(personId);
     if (balance == 0) {
@@ -374,6 +377,7 @@ class LedgerService {
       note: note ?? 'সম্পূর্ণ পরিশোধ',
       idempotencyKey: idempotencyKey,
       isSettlement: true,
+      paymentMethod: paymentMethod,
     );
   }
 }

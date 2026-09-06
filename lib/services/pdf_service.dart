@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -50,24 +51,38 @@ class PdfService {
         theme: pw.ThemeData.withFont(base: font, bold: font),
         build: (context) => [
           pw.Text(
-            'খাতা বন্ধু - লেনদেনের বিবরণী',
+            'দেনা পাওনা - লেনদেনের বিবরণী',
             style: pw.TextStyle(font: font, fontSize: 20),
           ),
           pw.SizedBox(height: 8),
-          pw.Text('ব্যক্তি: ${person.name}', style: pw.TextStyle(font: font, fontSize: 14)),
+          pw.Text(
+            'ব্যক্তি: ${person.name}',
+            style: pw.TextStyle(font: font, fontSize: 14),
+          ),
           if (person.phone != null)
-            pw.Text('ফোন: ${person.phone}', style: pw.TextStyle(font: font, fontSize: 12)),
+            pw.Text(
+              'ফোন: ${person.phone}',
+              style: pw.TextStyle(font: font, fontSize: 12),
+            ),
           pw.SizedBox(height: 4),
           pw.Text(
             'বর্তমান ব্যালেন্স: ${Money.formatPaisa(currentBalancePaisa)} '
             '${currentBalancePaisa >= 0 ? '(পাবো)' : '(দেবো)'}',
-            style: pw.TextStyle(font: font, fontSize: 14, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+              font: font,
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
           pw.SizedBox(height: 16),
           pw.Table.fromTextArray(
             headers: ['তারিখ', 'ধরন', 'পরিমাণ', 'ব্যালেন্স', 'নোট'],
             data: rows,
-            headerStyle: pw.TextStyle(font: font, fontSize: 10, fontWeight: pw.FontWeight.bold),
+            headerStyle: pw.TextStyle(
+              font: font,
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+            ),
             cellStyle: pw.TextStyle(font: font, fontSize: 9),
             cellAlignment: pw.Alignment.centerLeft,
             headerDecoration: const pw.BoxDecoration(color: PdfColors.teal100),
@@ -84,36 +99,108 @@ class PdfService {
   }
 
   Future<File> generateReportPdf({
-    required String title,
-    required List<List<String>> headers,
     required List<List<String>> rows,
-    required String summaryLine,
+    required int totalReceivedPaisa,
+    required int totalPaidPaisa,
   }) async {
     final font = await _loadFont();
     final doc = pw.Document();
+    final now = DateTime.now();
+    final netBalancePaisa = totalReceivedPaisa - totalPaidPaisa;
+    final dateLabel =
+        '${now.day.toString().padLeft(2, '0')}/'
+        '${now.month.toString().padLeft(2, '0')}/${now.year}';
     doc.addPage(
       pw.MultiPage(
         theme: pw.ThemeData.withFont(base: font, bold: font),
         build: (context) => [
-          pw.Text(title, style: pw.TextStyle(font: font, fontSize: 18)),
+          pw.Text(
+            'Dena Pawna / দেনা পাওনা',
+            style: pw.TextStyle(font: font, fontSize: 20),
+          ),
           pw.SizedBox(height: 8),
-          pw.Text(summaryLine, style: pw.TextStyle(font: font, fontSize: 12)),
+          pw.Text(
+            'Report date: $dateLabel',
+            style: pw.TextStyle(font: font, fontSize: 11),
+          ),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              _summaryCard('Total Received', totalReceivedPaisa, font),
+              _summaryCard('Total Paid', totalPaidPaisa, font),
+              _summaryCard('Net Balance', netBalancePaisa, font),
+            ],
+          ),
           pw.SizedBox(height: 16),
           pw.Table.fromTextArray(
-            headers: headers.isNotEmpty ? headers.first : [],
+            headers: const [
+              'Date',
+              'Person / Note',
+              'Payment Method',
+              'Type',
+              'Amount',
+            ],
             data: rows,
-            headerStyle: pw.TextStyle(font: font, fontSize: 10, fontWeight: pw.FontWeight.bold),
+            headerStyle: pw.TextStyle(
+              font: font,
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+            ),
             cellStyle: pw.TextStyle(font: font, fontSize: 9),
             headerDecoration: const pw.BoxDecoration(color: PdfColors.teal100),
           ),
         ],
       ),
     );
-    final dir = await getApplicationDocumentsDirectory();
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final file = File('${dir.path}/report_$timestamp.pdf');
+    final dir = await _reportDirectory();
+    final timestamp =
+        '${now.year}${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}';
+    final file = File('${dir.path}/DenaPawna_Report_$timestamp.pdf');
     await file.writeAsBytes(await doc.save());
     return file;
+  }
+
+  pw.Widget _summaryCard(String label, int amountPaisa, pw.Font font) {
+    return pw.Container(
+      width: 160,
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.teal200),
+        borderRadius: pw.BorderRadius.circular(6),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(label, style: pw.TextStyle(font: font, fontSize: 9)),
+          pw.SizedBox(height: 3),
+          pw.Text(
+            Money.formatPaisa(amountPaisa),
+            style: pw.TextStyle(font: font, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Directory> _reportDirectory() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      final downloads = Directory('/storage/emulated/0/Download');
+      if (!await downloads.exists()) await downloads.create(recursive: true);
+      return downloads;
+    }
+    if (!kIsWeb &&
+        (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+      final downloads = await getDownloadsDirectory();
+      if (downloads != null) {
+        if (!await downloads.exists()) await downloads.create(recursive: true);
+        return downloads;
+      }
+    }
+    return getApplicationDocumentsDirectory();
   }
 
   /// Generates a friendly Bangla payment reminder message for sharing
@@ -125,12 +212,12 @@ class PdfService {
     final amount = Money.formatPaisa(balancePaisa.abs());
     if (balancePaisa > 0) {
       return 'প্রিয় ${person.name}, আপনার কাছে আমার $amount টাকা বাকি আছে। '
-          'সময় করে পরিশোধ করলে ভালো হয়। ধন্যবাদ। - খাতা বন্ধু';
+          'সময় করে পরিশোধ করলে ভালো হয়। ধন্যবাদ। - দেনা পাওনা';
     } else if (balancePaisa < 0) {
       return 'প্রিয় ${person.name}, আপনাকে আমার $amount টাকা দেওয়া বাকি আছে। '
-          'শীঘ্রই পরিশোধ করে দিবো। ধন্যবাদ। - খাতা বন্ধু';
+          'শীঘ্রই পরিশোধ করে দিবো। ধন্যবাদ। - দেনা পাওনা';
     } else {
-      return '${person.name}, আপনার সাথে আমার হিসাব সম্পূর্ণ পরিশোধ করা আছে। ধন্যবাদ। - খাতা বন্ধু';
+      return '${person.name}, আপনার সাথে আমার হিসাব সম্পূর্ণ পরিশোধ করা আছে। ধন্যবাদ। - দেনা পাওনা';
     }
   }
 }

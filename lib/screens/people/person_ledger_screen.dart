@@ -31,15 +31,70 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
     final controller = TextEditingController(
       text: (suggestedBalancePaisa.abs() / 100).toStringAsFixed(0),
     );
-    final amount = await showDialog<double>(
+    var selectedMethod = 'cash';
+    final result = await showDialog<(double, String)>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('পরিশোধ যুক্ত করুন'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'পরিমাণ (৳)', prefixText: '৳ '),
+        content: StatefulBuilder(
+          builder: (context, setDialogState) {
+            const methods = {
+              'cash': ('Cash', Icons.payments_outlined, Colors.green),
+              'bkash': ('bKash', Icons.phone_android, Colors.pink),
+              'nagad': (
+                'Nagad',
+                Icons.account_balance_wallet_outlined,
+                Colors.orange,
+              ),
+              'bank': (
+                'Bank Transfer',
+                Icons.account_balance_outlined,
+                Colors.blue,
+              ),
+            };
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'পরিমাণ (৳)',
+                    prefixText: '৳ ',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'Payment method / channel',
+                  ),
+                  items: methods.entries
+                      .map(
+                        (entry) => DropdownMenuItem(
+                          value: entry.key,
+                          child: Row(
+                            children: [
+                              Icon(entry.value.$2, color: entry.value.$3),
+                              const SizedBox(width: 8),
+                              Text(entry.value.$1),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedMethod = value);
+                    }
+                  },
+                ),
+              ],
+            );
+          },
         ),
         actions: [
           TextButton(
@@ -49,26 +104,30 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
           ElevatedButton(
             onPressed: () {
               final value = Money.parseAmountInput(controller.text);
-              Navigator.pop(ctx, value);
+              if (value != null) {
+                Navigator.pop(ctx, (value, selectedMethod));
+              }
             },
             child: const Text('যুক্ত করুন'),
           ),
         ],
       ),
     );
-    if (amount == null) return;
+    if (result == null) return;
     setState(() => _busy = true);
     try {
       await context.read<LedgerProvider>().recordPayment(
-            personId: widget.personId,
-            amountPaisa: Money.takaToPaisa(amount),
-            date: DateTime.now(),
-            idempotencyKey: const Uuid().v4(),
-          );
+        personId: widget.personId,
+        amountPaisa: Money.takaToPaisa(result.$1),
+        date: DateTime.now(),
+        idempotencyKey: const Uuid().v4(),
+        paymentMethod: result.$2,
+      );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -97,21 +156,73 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
       ),
     );
     if (confirm != true) return;
+    final paymentMethod = await _choosePaymentMethod();
+    if (paymentMethod == null) return;
     setState(() => _busy = true);
     try {
       await context.read<LedgerProvider>().settleFully(
-            personId: widget.personId,
-            date: DateTime.now(),
-            idempotencyKey: const Uuid().v4(),
-          );
+        personId: widget.personId,
+        date: DateTime.now(),
+        idempotencyKey: const Uuid().v4(),
+        paymentMethod: paymentMethod,
+      );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<String?> _choosePaymentMethod() async {
+    const methods = {
+      'cash': ('Cash', Icons.payments_outlined, Colors.green),
+      'bkash': ('bKash', Icons.phone_android, Colors.pink),
+      'nagad': ('Nagad', Icons.account_balance_wallet_outlined, Colors.orange),
+      'bank': ('Bank Transfer', Icons.account_balance_outlined, Colors.blue),
+    };
+    var selected = 'cash';
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Payment method / channel'),
+          content: DropdownButtonFormField<String>(
+            initialValue: selected,
+            items: methods.entries
+                .map(
+                  (entry) => DropdownMenuItem(
+                    value: entry.key,
+                    child: Row(
+                      children: [
+                        Icon(entry.value.$2, color: entry.value.$3),
+                        const SizedBox(width: 8),
+                        Text(entry.value.$1),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value != null) setDialogState(() => selected = value);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('বাতিল'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: const Text('নিশ্চিত করুন'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _shareReminder(int balancePaisa) async {
@@ -141,8 +252,9 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
       await _backupService.shareFile(file);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('শেয়ার করা যায়নি: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('শেয়ার করা যায়নি: $e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -169,7 +281,8 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.payableRed),
+                backgroundColor: AppColors.payableRed,
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('ডিলিট করুন'),
             ),
@@ -191,7 +304,8 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.payableRed),
+                backgroundColor: AppColors.payableRed,
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('ডিলিট করুন'),
             ),
@@ -205,8 +319,9 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -223,8 +338,9 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
             child: const Text('বাতিল'),
           ),
           ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppColors.payableRed),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.payableRed,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('ডিলিট করুন'),
           ),
@@ -252,7 +368,9 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
     final provider = context.watch<LedgerProvider>();
     final person = provider.getPerson(widget.personId);
     if (person == null) {
-      return const Scaffold(body: Center(child: Text('ব্যক্তি খুঁজে পাওয়া যায়নি')));
+      return const Scaffold(
+        body: Center(child: Text('ব্যক্তি খুঁজে পাওয়া যায়নি')),
+      );
     }
     final totals = provider.personTotals(widget.personId);
     final txns = provider.transactionsForPerson(widget.personId);
@@ -260,8 +378,8 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
     final balanceColor = balance > 0
         ? AppColors.receivableGreen
         : balance < 0
-            ? AppColors.payableRed
-            : Colors.grey;
+        ? AppColors.payableRed
+        : Colors.grey;
 
     // Precompute running balances for the timeline (oldest -> newest).
     int running = 0;
@@ -279,8 +397,11 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
             onSelected: (value) async {
               switch (value) {
                 case 'edit':
-                  Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => AddEditPersonScreen(existing: person)));
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AddEditPersonScreen(existing: person),
+                    ),
+                  );
                   break;
                 case 'delete':
                   await _deletePerson();
@@ -294,15 +415,24 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'edit', child: Text('ব্যক্তি সম্পাদনা')),
               const PopupMenuItem(
-                  value: 'share_pdf', child: Text('PDF শেয়ার করুন')),
+                value: 'edit',
+                child: Text('ব্যক্তি সম্পাদনা'),
+              ),
               const PopupMenuItem(
-                  value: 'reminder', child: Text('রিমাইন্ডার পাঠান')),
+                value: 'share_pdf',
+                child: Text('PDF শেয়ার করুন'),
+              ),
+              const PopupMenuItem(
+                value: 'reminder',
+                child: Text('রিমাইন্ডার পাঠান'),
+              ),
               const PopupMenuItem(
                 value: 'delete',
-                child: Text('ব্যক্তি ডিলিট করুন',
-                    style: TextStyle(color: AppColors.payableRed)),
+                child: Text(
+                  'ব্যক্তি ডিলিট করুন',
+                  style: TextStyle(color: AppColors.payableRed),
+                ),
               ),
             ],
           ),
@@ -318,9 +448,10 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
                     child: Column(
                       children: [
                         PersonAvatar(
-                            name: person.name,
-                            photoPath: person.photoPath,
-                            radius: 36),
+                          name: person.name,
+                          photoPath: person.photoPath,
+                          radius: 36,
+                        ),
                         const SizedBox(height: 8),
                         if (person.phone != null) Text(person.phone!),
                       ],
@@ -339,11 +470,12 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
                           balance > 0
                               ? 'আপনি পাবেন'
                               : balance < 0
-                                  ? 'আপনাকে দিতে হবে'
-                                  : 'হিসাব সমান',
+                              ? 'আপনাকে দিতে হবে'
+                              : 'হিসাব সমান',
                           style: TextStyle(
-                              color: balanceColor,
-                              fontWeight: FontWeight.w600),
+                            color: balanceColor,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -358,13 +490,19 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
                         Row(
                           children: [
                             Expanded(
-                              child: _statBox('মোট পাওনা তৈরি',
-                                  totals.totalLentPaisa, Colors.black87),
+                              child: _statBox(
+                                'মোট পাওনা তৈরি',
+                                totals.totalLentPaisa,
+                                Colors.black87,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: _statBox('মোট পরিশোধ',
-                                  totals.totalPaidPaisa, Colors.black87),
+                              child: _statBox(
+                                'মোট পরিশোধ',
+                                totals.totalPaidPaisa,
+                                Colors.black87,
+                              ),
                             ),
                           ],
                         ),
@@ -396,10 +534,15 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
                     children: [
                       const Text(
                         'লেনদেনের ইতিহাস',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                        ),
                       ),
-                      Text('${txns.length} টি',
-                          style: TextStyle(color: Colors.grey.shade600)),
+                      Text(
+                        '${txns.length} টি',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -407,8 +550,10 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 40),
                       child: Center(
-                        child: Text('কোনো লেনদেন নেই',
-                            style: TextStyle(color: Colors.grey.shade600)),
+                        child: Text(
+                          'কোনো লেনদেন নেই',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
                       ),
                     )
                   else
@@ -420,8 +565,10 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 16),
                           color: AppColors.payableRed.withValues(alpha: 0.15),
-                          child: const Icon(Icons.delete,
-                              color: AppColors.payableRed),
+                          child: const Icon(
+                            Icons.delete,
+                            color: AppColors.payableRed,
+                          ),
                         ),
                         confirmDismiss: (_) async {
                           await _deleteTransaction(t);
@@ -465,8 +612,10 @@ class _PersonLedgerScreenState extends State<PersonLedgerScreen> {
       ),
       child: Column(
         children: [
-          Text(label,
-              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700)),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700),
+          ),
           const SizedBox(height: 4),
           Text(
             Money.formatPaisa(paisa),

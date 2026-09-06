@@ -70,7 +70,7 @@ class _LockScreenState extends State<LockScreen> {
             const Icon(Icons.lock_outline, color: Colors.white, size: 48),
             const SizedBox(height: 16),
             const Text(
-              'খাতা বন্ধু লক করা আছে',
+              'দেনা পাওনা লক করা আছে',
               style: TextStyle(
                   color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
             ),

@@ -6,6 +6,8 @@ plugins {
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+project.setProperty("archivesBaseName", "DenaPawna")
+
 android {
     namespace = "com.khatabondhu.flutter_app"
     compileSdk = flutter.compileSdkVersion

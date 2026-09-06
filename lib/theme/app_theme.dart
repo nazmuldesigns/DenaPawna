@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Central design tokens & ThemeData for Khata Bondhu.
+/// Central design tokens & ThemeData for Dena Pawna.
 /// Original branding: teal-based fintech palette, NOT copied from any
 /// existing app's proprietary design.
 class AppColors {

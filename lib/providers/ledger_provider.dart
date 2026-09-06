@@ -156,6 +156,7 @@ class LedgerProvider extends ChangeNotifier {
     required DateTime date,
     String? note,
     String? idempotencyKey,
+    String paymentMethod = 'cash',
   }) async {
     final txn = await _service.recordPayment(
       personId: personId,
@@ -163,6 +164,7 @@ class LedgerProvider extends ChangeNotifier {
       date: date,
       note: note,
       idempotencyKey: idempotencyKey,
+      paymentMethod: paymentMethod,
     );
     notifyListeners();
     return txn;
@@ -173,12 +175,14 @@ class LedgerProvider extends ChangeNotifier {
     required DateTime date,
     String? note,
     String? idempotencyKey,
+    String paymentMethod = 'cash',
   }) async {
     final txn = await _service.settleFully(
       personId: personId,
       date: date,
       note: note,
       idempotencyKey: idempotencyKey,
+      paymentMethod: paymentMethod,
     );
     notifyListeners();
     return txn;

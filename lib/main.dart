@@ -64,7 +64,7 @@ class KhataBondhuApp extends StatelessWidget {
       child: Consumer2<SettingsProvider, AuthProvider>(
         builder: (context, settings, auth, _) {
           return MaterialApp(
-            title: 'খাতা বন্ধু',
+            title: 'Dena Pawna',
             debugShowCheckedModeBanner: false,
             themeMode: settings.themeMode,
             theme: AppTheme.light(),

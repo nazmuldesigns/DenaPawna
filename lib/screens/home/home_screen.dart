@@ -24,7 +24,7 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('খাতা বন্ধু'),
+        title: const Text('দেনা পাওনা'),
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_none),

@@ -54,7 +54,7 @@ class BackupService {
     return {
       'schemaVersion': 1,
       'exportedAt': DateTime.now().toIso8601String(),
-      'appName': 'Khata Bondhu',
+      'appName': 'Dena Pawna',
       'people': people,
       'transactions': txns,
     };

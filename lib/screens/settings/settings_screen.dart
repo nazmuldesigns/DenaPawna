@@ -27,7 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _busy = true);
     try {
       final file = await _backupService.exportToJsonFile();
-      await _backupService.shareFile(file, text: 'খাতা বন্ধু ব্যাকআপ ফাইল');
+      await _backupService.shareFile(file, text: 'দেনা পাওনা ব্যাকআপ ফাইল');
     } catch (e) {
       _showError('$e');
     } finally {
@@ -39,7 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _busy = true);
     try {
       final file = await _backupService.exportToCsvFile();
-      await _backupService.shareFile(file, text: 'খাতা বন্ধু CSV এক্সপোর্ট');
+      await _backupService.shareFile(file, text: 'দেনা পাওনা CSV এক্সপোর্ট');
     } catch (e) {
       _showError('$e');
     } finally {
@@ -236,7 +236,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _sectionTitle('অ্যাপ তথ্য'),
                   const ListTile(
                     leading: Icon(Icons.info_outline),
-                    title: Text('খাতা বন্ধু'),
+                    title: Text('দেনা পাওনা'),
                     subtitle: Text(
                       'সংস্করণ ১.০.০ • ব্যক্তিগত দেনা-পাওনার খাতা',
                     ),

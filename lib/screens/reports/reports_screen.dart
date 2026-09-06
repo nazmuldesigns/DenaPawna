@@ -88,17 +88,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (picked != null) setState(() => _customRange = picked);
   }
 
-  Future<void> _exportPdf(List<LedgerTransaction> txns, LedgerProvider provider) async {
+  Future<void> _exportPdf(
+    List<LedgerTransaction> txns,
+    LedgerProvider provider,
+  ) async {
     setState(() => _busy = true);
     try {
       final peopleById = {for (final p in provider.allPeople) p.id: p};
       final rows = txns
-          .map((t) => [
-                AppDateUtils.formatDate(t.date),
-                peopleById[t.personId]?.name ?? 'অজানা',
-                t.type.labelBn,
-                Money.formatPaisa(t.amountPaisa),
-              ])
+          .map(
+            (t) => [
+              AppDateUtils.formatDate(t.date),
+              '${peopleById[t.personId]?.name ?? 'অজানা'}'
+                  '${t.note == null || t.note!.isEmpty ? '' : ' / ${t.note}'}',
+              _paymentMethodLabel(t.paymentMethod),
+              t.type.labelBn,
+              Money.formatPaisa(t.amountPaisa),
+            ],
+          )
           .toList();
       final receivable = txns
           .where((t) => t.balanceDeltaPaisa > 0)
@@ -107,23 +114,40 @@ class _ReportsScreenState extends State<ReportsScreen> {
           .where((t) => t.balanceDeltaPaisa < 0)
           .fold<int>(0, (sum, t) => sum + -t.balanceDeltaPaisa);
       final file = await _pdfService.generateReportPdf(
-        title: 'খাতা বন্ধু রিপোর্ট',
-        headers: [
-          ['তারিখ', 'ব্যক্তি', 'ধরন', 'পরিমাণ']
-        ],
         rows: rows,
-        summaryLine:
-            'পাবো: ${Money.formatPaisa(receivable)}   দেবো: ${Money.formatPaisa(payable)}',
+        totalReceivedPaisa: receivable,
+        totalPaidPaisa: payable,
       );
-      await _backupService.shareFile(file);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('PDF saved to Downloads'),
+            action: SnackBarAction(
+              label: 'Open',
+              onPressed: () => _backupService.shareFile(file),
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String _paymentMethodLabel(String method) {
+    const labels = {
+      'cash': 'Cash',
+      'bkash': 'bKash',
+      'nagad': 'Nagad',
+      'bank': 'Bank',
+    };
+    return labels[method] ?? 'Cash';
   }
 
   @override
@@ -164,13 +188,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         SegmentedButton<ReportPeriod>(
                           segments: const [
                             ButtonSegment(
-                                value: ReportPeriod.daily, label: Text('দৈনিক')),
+                              value: ReportPeriod.daily,
+                              label: Text('দৈনিক'),
+                            ),
                             ButtonSegment(
-                                value: ReportPeriod.monthly,
-                                label: Text('মাসিক')),
+                              value: ReportPeriod.monthly,
+                              label: Text('মাসিক'),
+                            ),
                             ButtonSegment(
-                                value: ReportPeriod.custom,
-                                label: Text('কাস্টম')),
+                              value: ReportPeriod.custom,
+                              label: Text('কাস্টম'),
+                            ),
                           ],
                           selected: {_period},
                           onSelectionChanged: (s) =>
@@ -181,21 +209,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
-                                icon: const Icon(Icons.calendar_today, size: 16),
+                                icon: const Icon(
+                                  Icons.calendar_today,
+                                  size: 16,
+                                ),
                                 onPressed: _period == ReportPeriod.daily
                                     ? _pickDay
                                     : _period == ReportPeriod.monthly
-                                        ? _pickMonth
-                                        : _pickCustomRange,
+                                    ? _pickMonth
+                                    : _pickCustomRange,
                                 label: Text(
                                   _period == ReportPeriod.daily
                                       ? AppDateUtils.formatDate(_selectedDate)
                                       : _period == ReportPeriod.monthly
-                                          ? AppDateUtils.formatMonth(
-                                              _selectedDate)
-                                          : _customRange == null
-                                              ? 'তারিখ নির্বাচন করুন'
-                                              : '${AppDateUtils.formatDate(_customRange!.start)} - ${AppDateUtils.formatDate(_customRange!.end)}',
+                                      ? AppDateUtils.formatMonth(_selectedDate)
+                                      : _customRange == null
+                                      ? 'তারিখ নির্বাচন করুন'
+                                      : '${AppDateUtils.formatDate(_customRange!.start)} - ${AppDateUtils.formatDate(_customRange!.end)}',
                                 ),
                               ),
                             ),
@@ -205,14 +235,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                 initialValue: _selectedPersonId,
                                 decoration: const InputDecoration(
                                   contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
                                 ),
                                 items: [
                                   const DropdownMenuItem(
-                                      value: null, child: Text('সবাই')),
-                                  ...provider.allPeople.map((p) =>
-                                      DropdownMenuItem(
-                                          value: p.id, child: Text(p.name))),
+                                    value: null,
+                                    child: Text('সবাই'),
+                                  ),
+                                  ...provider.allPeople.map(
+                                    (p) => DropdownMenuItem(
+                                      value: p.id,
+                                      child: Text(p.name),
+                                    ),
+                                  ),
                                 ],
                                 onChanged: (v) =>
                                     setState(() => _selectedPersonId = v),
@@ -229,12 +266,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       children: [
                         Expanded(
                           child: _summaryChip(
-                              'পাবো', receivable, AppColors.receivableGreen),
+                            'পাবো',
+                            receivable,
+                            AppColors.receivableGreen,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: _summaryChip(
-                              'দেবো', payable, AppColors.payableRed),
+                            'দেবো',
+                            payable,
+                            AppColors.payableRed,
+                          ),
                         ),
                       ],
                     ),
@@ -243,8 +286,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   Expanded(
                     child: txns.isEmpty
                         ? Center(
-                            child: Text('এই সময়ের কোনো লেনদেন নেই',
-                                style: TextStyle(color: Colors.grey.shade600)),
+                            child: Text(
+                              'এই সময়ের কোনো লেনদেন নেই',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
                           )
                         : ListView.separated(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -276,9 +321,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
-          Text(Money.formatPaisa(paisa),
-              style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+          Text(
+            Money.formatPaisa(paisa),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          ),
         ],
       ),
     );

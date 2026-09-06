@@ -75,7 +75,7 @@ class PdfService {
             ),
           ),
           pw.SizedBox(height: 16),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: ['তারিখ', 'ধরন', 'পরিমাণ', 'ব্যালেন্স', 'নোট'],
             data: rows,
             headerStyle: pw.TextStyle(
@@ -133,7 +133,7 @@ class PdfService {
             ],
           ),
           pw.SizedBox(height: 16),
-          pw.Table.fromTextArray(
+          pw.TableHelper.fromTextArray(
             headers: const [
               'Date',
               'Person / Note',

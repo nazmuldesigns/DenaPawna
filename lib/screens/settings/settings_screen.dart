@@ -74,7 +74,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final files = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['json'],
-        allowMultiple: false,
       );
       if (files.isEmpty || files.single.path == null) return;
       setState(() => _busy = true);
@@ -138,23 +137,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const Divider(),
                   _sectionTitle('থিম'),
-                  RadioListTile<ThemeMode>(
-                    title: const Text('সিস্টেম ডিফল্ট'),
-                    value: ThemeMode.system,
+                  RadioGroup<ThemeMode>(
                     groupValue: settings.themeMode,
-                    onChanged: (v) => settings.setThemeMode(v!),
-                  ),
-                  RadioListTile<ThemeMode>(
-                    title: const Text('লাইট মোড'),
-                    value: ThemeMode.light,
-                    groupValue: settings.themeMode,
-                    onChanged: (v) => settings.setThemeMode(v!),
-                  ),
-                  RadioListTile<ThemeMode>(
-                    title: const Text('ডার্ক মোড'),
-                    value: ThemeMode.dark,
-                    groupValue: settings.themeMode,
-                    onChanged: (v) => settings.setThemeMode(v!),
+                    onChanged: (value) {
+                      if (value != null) settings.setThemeMode(value);
+                    },
+                    child: Column(
+                      children: [
+                        RadioListTile<ThemeMode>(
+                          title: const Text('সিস্টেম ডিফল্ট'),
+                          value: ThemeMode.system,
+                        ),
+                        RadioListTile<ThemeMode>(
+                          title: const Text('লাইট মোড'),
+                          value: ThemeMode.light,
+                        ),
+                        RadioListTile<ThemeMode>(
+                          title: const Text('ডার্ক মোড'),
+                          value: ThemeMode.dark,
+                        ),
+                      ],
+                    ),
                   ),
                   const Divider(),
                   _sectionTitle('সুরক্ষা'),

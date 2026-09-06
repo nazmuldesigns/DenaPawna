@@ -159,16 +159,22 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   void _appendCalculatorInput(String value) {
     setState(() {
       if (value == '.') {
-        final currentNumber = _calculatorExpression.split(RegExp(r'[+-]')).last;
+        final currentNumber = _calculatorExpression
+            .split(RegExp(r'[+\-÷×xX*/%]'))
+            .last;
         if (currentNumber.contains('.')) return;
         if (currentNumber.isEmpty) _calculatorExpression += '0';
       }
       _calculatorExpression += value;
+      _amountController.text = _calculatorExpression;
     });
   }
 
   void _clearCalculator() {
-    setState(() => _calculatorExpression = '');
+    setState(() {
+      _calculatorExpression = '';
+      _amountController.clear();
+    });
   }
 
   void _backspaceCalculator() {
@@ -178,6 +184,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         0,
         _calculatorExpression.length - 1,
       );
+      _amountController.text = _calculatorExpression;
     });
   }
 
@@ -185,7 +192,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     final expression = _calculatorExpression.trim();
     if (expression.isEmpty) return null;
     final tokens = RegExp(
-      r'\d+(?:\.\d+)?|[+-]',
+      r'\d+(?:\.\d+)?|[+\-÷×xX*/%]',
     ).allMatches(expression).map((match) => match.group(0)!).toList();
     if (tokens.isEmpty || tokens.join() != expression) return null;
     var total = double.tryParse(tokens.first);
@@ -194,10 +201,24 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
       if (index + 1 >= tokens.length) return null;
       final value = double.tryParse(tokens[index + 1]);
       if (value == null) return null;
-      if (tokens[index] == '+') {
-        total = total! + value;
-      } else {
-        total = total! - value;
+      switch (tokens[index]) {
+        case '+':
+          total = total! + value;
+        case '-':
+          total = total! - value;
+        case '×':
+        case 'x':
+        case 'X':
+        case '*':
+          total = total! * value;
+        case '÷':
+        case '/':
+          if (value == 0) return null;
+          total = total! / value;
+        case '%':
+          total = total! * value / 100;
+        default:
+          return null;
       }
     }
     return total;
@@ -231,93 +252,98 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
         title: Text(_isEditing ? 'লেনদেন সম্পাদনা' : 'নতুন লেনদেন'),
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildTypeSelector(),
-              const SizedBox(height: 20),
-              if (widget.personId == null && !_isEditing) ...[
-                _buildPersonSelector(people),
-                const SizedBox(height: 16),
-              ] else if (_selectedPersonId != null) ...[
-                _buildPersonReadonly(provider),
-                const SizedBox(height: 16),
-              ],
-              TextFormField(
-                controller: _amountController,
-                readOnly: true,
-                onTap: _openKeypad,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9০-৯.,]')),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'পরিমাণ (৳)',
-                  prefixText: '৳ ',
-                ),
-                validator: (v) {
-                  if (Money.parseAmountInput(v ?? '') == null) {
-                    return 'সঠিক পরিমাণ লিখুন (শূন্যের বেশি)';
-                  }
-                  return null;
-                },
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: _keypadVisible
-                    ? _buildCalculatorKeypad()
-                    : const SizedBox.shrink(),
-              ),
-              const SizedBox(height: 16),
-              _buildPaymentMethodSelector(),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: _pickDate,
-                borderRadius: BorderRadius.circular(14),
-                child: InputDecorator(
-                  decoration: const InputDecoration(labelText: 'তারিখ ও সময়'),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${_date.day}/${_date.month}/${_date.year}  '
-                        '${_date.hour.toString().padLeft(2, '0')}:${_date.minute.toString().padLeft(2, '0')}',
-                      ),
-                      const Icon(Icons.calendar_today, size: 18),
+        child: Column(
+          children: [
+            Expanded(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _buildTypeSelector(),
+                    const SizedBox(height: 20),
+                    if (widget.personId == null && !_isEditing) ...[
+                      _buildPersonSelector(people),
+                      const SizedBox(height: 16),
+                    ] else if (_selectedPersonId != null) ...[
+                      _buildPersonReadonly(provider),
+                      const SizedBox(height: 16),
                     ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _noteController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'নোট (ঐচ্ছিক)',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 28),
-              ElevatedButton(
-                onPressed: _submitting ? null : _submit,
-                child: _submitting
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                    TextFormField(
+                      controller: _amountController,
+                      readOnly: true,
+                      onTap: _openKeypad,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'[0-9০-৯.,]'),
                         ),
-                      )
-                    : Text(_isEditing ? 'আপডেট করুন' : 'সংরক্ষণ করুন'),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'পরিমাণ (৳)',
+                        prefixText: '৳ ',
+                      ),
+                      validator: (v) {
+                        if (Money.parseAmountInput(v ?? '') == null) {
+                          return 'সঠিক পরিমাণ লিখুন (শূন্যের বেশি)';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildPaymentMethodSelector(),
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'তারিখ ও সময়',
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${_date.day}/${_date.month}/${_date.year}  '
+                              '${_date.hour.toString().padLeft(2, '0')}:'
+                              '${_date.minute.toString().padLeft(2, '0')}',
+                            ),
+                            const Icon(Icons.calendar_today, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _noteController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'নোট (ঐচ্ছিক)',
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    ElevatedButton(
+                      onPressed: _submitting ? null : _submit,
+                      child: _submitting
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(_isEditing ? 'আপডেট করুন' : 'সংরক্ষণ করুন'),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+            if (_keypadVisible) _buildCalculatorKeypad(),
+          ],
         ),
       ),
     );
@@ -326,102 +352,91 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   Widget _buildCalculatorKeypad() {
     final preview = _calculatorExpression.isEmpty ? '0' : _calculatorExpression;
     return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade300),
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade300)),
       ),
       child: Column(
         children: [
-          Align(
+          Container(
+            height: 38,
             alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               preview,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _calculatorButton('C', _clearCalculator)),
-              Expanded(
-                child: _calculatorButton(
-                  '⌫',
-                  _backspaceCalculator,
-                  color: Colors.orange,
+          SizedBox(
+            height: 240,
+            child: Column(
+              children: [
+                _calculatorRow(['AC', '%', '÷', '×']),
+                _calculatorRow(['7', '8', '9', '-']),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          children: [
+                            _calculatorRow(['4', '5', '6']),
+                            _calculatorRow(['1', '2', '3']),
+                          ],
+                        ),
+                      ),
+                      Expanded(child: _calculatorCell('+', accent: true)),
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                flex: 2,
-                child: _calculatorButton(
-                  'OK',
-                  _finishCalculator,
-                  color: AppColors.receivableGreen,
-                  textColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          for (final row in const [
-            ['7', '8', '9', '+'],
-            ['4', '5', '6', '-'],
-            ['1', '2', '3', '00'],
-            ['0', '.', '=', ''],
-          ])
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                children: row.map((key) {
-                  if (key.isEmpty) return const Expanded(child: SizedBox());
-                  final isOperator = key == '+' || key == '-' || key == '=';
-                  return Expanded(
-                    child: _calculatorButton(
-                      key,
-                      key == '='
-                          ? _finishCalculator
-                          : () => _appendCalculatorInput(key),
-                      color: isOperator
-                          ? AppColors.teal.withValues(alpha: 0.12)
-                          : Colors.white,
-                      textColor: isOperator ? AppColors.teal : null,
-                    ),
-                  );
-                }).toList(),
-              ),
+                _calculatorRow(['⌫', '0', '.', '=']),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _calculatorButton(
-    String label,
-    VoidCallback onPressed, {
-    Color? color,
-    Color? textColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: SizedBox(
-        height: 48,
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            elevation: 0,
-            backgroundColor: color ?? Colors.white,
-            foregroundColor: textColor ?? Colors.grey.shade800,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+  Widget _calculatorRow(List<String> labels) {
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: labels
+            .map((label) => Expanded(child: _calculatorCell(label)))
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _calculatorCell(String label, {bool accent = false}) {
+    final action = switch (label) {
+      'AC' => _clearCalculator,
+      '⌫' => _backspaceCalculator,
+      '=' => _finishCalculator,
+      _ => () => _appendCalculatorInput(label),
+    };
+    return InkWell(
+      onTap: action,
+      child: Container(
+        height: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: accent
+              ? const Color(0xffffe5ed)
+              : label == '='
+                  ? const Color(0xffffe5ed)
+                  : Colors.white,
+          border: Border.all(color: Colors.grey.shade300, width: 0.6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: accent || label == '=' ? Colors.pink.shade700 : Colors.black87,
           ),
         ),
       ),

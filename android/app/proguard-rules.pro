@@ -1,0 +1,2 @@
+-keep class com.supabase.** { *; }
+-keepclassmembers class * { @com.google.gson.annotations.SerializedName <fields>; }

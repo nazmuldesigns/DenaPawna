@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../screens/root_shell.dart';
+import '../../services/supabase_auth_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -55,6 +56,8 @@ class _AuthScreenState extends State<AuthScreen> {
         if (mounted) {
           setState(() => _message = _friendlyAuthError(error));
         }
+      } catch (error) {
+        if (mounted) setState(() => _message = _friendlyError(error));
       }
       return;
     }
@@ -68,19 +71,19 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _message = _friendlyError(error));
+      final message = _friendlyError(error);
+      setState(() => _message = message);
+      _showErrorSnackBar(message);
       return;
     }
     if (!mounted) return;
-    if (auth.errorMessage == null) {
-      setState(() {
-        _otpEmail = _emailController.text.trim();
-        _showOtp = true;
-        _startOtpTimer();
-        _message =
-            'A confirmation link has been sent to your email. Please verify your email before logging in.';
-      });
-    }
+    setState(() {
+      _otpEmail = _emailController.text.trim();
+      _showOtp = true;
+      _startOtpTimer();
+      _message =
+          'A confirmation code has been sent to your email. Please check your inbox and spam folder.';
+    });
   }
 
   void _startOtpTimer() {
@@ -102,18 +105,17 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_otpSeconds > 0 || _otpEmail == null) return;
     final auth = context.read<AuthProvider>();
     try {
-      await auth.service.signUpWithEmail(
-        email: _otpEmail!,
-        password: _passwordController.text.trim(),
-        name: _nameController.text.trim(),
-        phone: _mobileController.text.trim(),
-      );
+      await auth.service.resendSignupOtp(_otpEmail!);
       if (mounted) {
         _startOtpTimer();
         setState(() => _message = 'A new confirmation code was sent.');
       }
     } catch (error) {
-      if (mounted) setState(() => _message = _friendlyError(error));
+      if (mounted) {
+        final message = _friendlyError(error);
+        setState(() => _message = message);
+        _showErrorSnackBar(message);
+      }
     }
   }
 
@@ -290,13 +292,34 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   String _friendlyError(Object error) {
-    final message = error.toString();
+    if (error is AuthNetworkException) {
+      return 'ইন্টারনেট সংযোগ চেক করুন এবং আবার চেষ্টা করুন';
+    }
+    final message = error is AuthException ? error.message : error.toString();
+    final lowerMessage = message.toLowerCase();
+    if (lowerMessage.contains('rate limit') ||
+        lowerMessage.contains('too many') ||
+        lowerMessage.contains('smtp') ||
+        lowerMessage.contains('email rate')) {
+      return 'Email delivery is temporarily limited. Please wait a few minutes and try again.';
+    }
+    if (lowerMessage.contains('socket') ||
+        lowerMessage.contains('host lookup') ||
+        lowerMessage.contains('clientexception')) {
+      return 'ইন্টারনেট সংযোগ চেক করুন এবং আবার চেষ্টা করুন';
+    }
     if (message.toLowerCase().contains('expired') ||
         message.toLowerCase().contains('invalid')) {
       return 'That confirmation code is invalid or expired. Please try again.';
     }
 
     return message.replaceFirst('Exception: ', '');
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _friendlyAuthError(AuthException error) {

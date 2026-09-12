@@ -9,7 +9,7 @@ import 'screens/auth/auth_screen.dart';
 import 'screens/root_shell.dart';
 import 'services/database_service.dart';
 import 'services/supabase_auth_service.dart';
-import 'services/app_update_service.dart';
+import 'services/version_check_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/app_update_overlay.dart';
 
@@ -78,7 +78,7 @@ class KhataBondhuApp extends StatelessWidget {
             ],
             supportedLocales: const [Locale('en'), Locale('bn')],
             home: AppUpdateOverlay(
-              service: AppUpdateService(authService.client),
+              service: VersionCheckService(authService.client),
               child: auth.isAuthenticated
                   ? const RootShell()
                   : const AuthScreen(),

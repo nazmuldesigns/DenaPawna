@@ -28,10 +28,11 @@ android {
 
     buildTypes {
         release {
+            // Signing with the debug keys for now
             signingConfig = signingConfigs.getByName("debug")
         }
     }
-}
+} // <--- এই ক্লোজিং ব্র্যাকেটটি মিসিং ছিল, এটি বসানো হয়েছে
 
 kotlin {
     compilerOptions {

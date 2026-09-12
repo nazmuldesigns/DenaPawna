@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/app_update_service.dart';
+import '../services/version_check_service.dart';
 
 class AppUpdateOverlay extends StatefulWidget {
   const AppUpdateOverlay({
@@ -11,7 +11,7 @@ class AppUpdateOverlay extends StatefulWidget {
   });
 
   final Widget child;
-  final AppUpdateService service;
+  final VersionCheckService service;
 
   @override
   State<AppUpdateOverlay> createState() => _AppUpdateOverlayState();
@@ -75,6 +75,10 @@ class _AppUpdateOverlayState extends State<AppUpdateOverlay> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Version ${update.latestVersion} is available.'),
+                          if (update.releaseNotes.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(update.releaseNotes),
+                          ],
                           const SizedBox(height: 12),
                           const Text(
                             'Install the latest version to receive improvements '

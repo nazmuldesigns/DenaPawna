@@ -16,6 +16,7 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+    - temp_check/**
 include: package:flutter_lints/flutter.yaml
 
 linter:
